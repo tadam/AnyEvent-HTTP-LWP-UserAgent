@@ -47,9 +47,7 @@ You can use some AnyEvent::HTTP global function and variables.
 But use C<agent> of UA instead of $AnyEvent::HTTP::USERAGENT and C<max_redirect> instead of
 $AnyEvent::HTTP::MAX_RECURSE
 
-=back
-
-=head SEE ALSO
+=head1 SEE ALSO
 
 L<http://github.com/tadam/AnyEvent-HTTP-LWP-UserAgent>, L<Coro::LWP>, L<AnyEvent::HTTP>
 
