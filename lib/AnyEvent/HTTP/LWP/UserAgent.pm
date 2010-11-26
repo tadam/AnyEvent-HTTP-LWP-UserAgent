@@ -111,7 +111,7 @@ sub lwp_request2anyevent_request {
         $out_headers->{$header} = $value;
     } );
 
-    # if we wil use some code like
+    # if we will use some code like
     #    local $AnyEvent::HTTP::USERAGENT = $useragent;
     # in simple_request, it will not work properly in redirects
     $out_headers->{'User-Agent'} = $self->agent;
