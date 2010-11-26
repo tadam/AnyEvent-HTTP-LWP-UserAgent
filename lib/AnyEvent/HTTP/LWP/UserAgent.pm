@@ -61,11 +61,12 @@ use HTTP::Response;
 sub simple_request {
     my ($self, $in_req, $arg, $size) = @_;
 
-    my ($method, $uri, $args) = lwp_request2anyevent_request($in_req);
+    my ($method, $uri, $args) = $self->lwp_request2anyevent_request($in_req);
 
     my $cv = AE::cv;
     $cv->begin;
     my $out_req;
+    local $AnyEvent::HTTP::USERAGENT = $self->agent;
     http_request $method => $uri, %$args, sub {
         my ($d, $h) = @_;
         my $code = delete $h->{Status};
@@ -83,10 +84,11 @@ sub simple_request {
 }
 
 sub lwp_request2anyevent_request {
-    my $in_req = shift;
+    my ($self, $in_req) = @_;
 
     my $method = $in_req->method;
     my $uri = $in_req->uri->as_string;
+
     my $in_headers = $in_req->headers;
     my $out_headers = {};
     $in_headers->scan( sub {
@@ -98,7 +100,9 @@ sub lwp_request2anyevent_request {
 
     my %args = (
         headers => $out_headers,
-        body => $body
+        body => $body,
+        recurse => $self->max_redirect,
+        timeout => $self->timeout,
     );
     return ($method, $uri, \%args);
 }
