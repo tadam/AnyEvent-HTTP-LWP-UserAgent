@@ -66,7 +66,6 @@ sub simple_request {
     my $cv = AE::cv;
     $cv->begin;
     my $out_req;
-    local $AnyEvent::HTTP::USERAGENT = $self->agent;
     http_request $method => $uri, %$args, sub {
         my ($d, $h) = @_;
         my $code = delete $h->{Status};
@@ -79,6 +78,8 @@ sub simple_request {
         $cv->end;
     };
     $cv->recv;
+
+    $out_req->request($in_req);
 
     return $out_req;
 }
@@ -95,13 +96,14 @@ sub lwp_request2anyevent_request {
         my ($header, $value) = @_;
         $out_headers->{$header} = $value;
     } );
+    $out_headers->{'User-Agent'} = $self->agent;
 
     my $body = $in_req->content;
 
     my %args = (
         headers => $out_headers,
         body => $body,
-        recurse => $self->max_redirect,
+        recurse => 0,
         timeout => $self->timeout,
     );
     return ($method, $uri, \%args);
