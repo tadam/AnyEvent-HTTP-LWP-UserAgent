@@ -74,6 +74,14 @@ sub simple_request {
         while (my @h = each %$h) {
             push @headers, @h;
         }
+        if ($code >= 590 && $code <= 599) {
+            if ($message =~ /timed/ && $code == 599) {
+                $d = '500 read timeout';
+                $code = 500;
+            } elsif (!defined($d) || $d =~ /^\s*$/) {
+                $d = $message;
+            }
+        }
         $out_req = HTTP::Response->new($code, $message, \@headers, $d);
         $cv->end;
     };
@@ -102,7 +110,7 @@ sub lwp_request2anyevent_request {
 
     my %args = (
         headers => $out_headers,
-        body => $body,
+        body    => $body,
         recurse => 0,
         timeout => $self->timeout,
     );
