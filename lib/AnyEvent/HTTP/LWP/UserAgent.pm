@@ -44,8 +44,8 @@ or something else). Precise documentation and realization of these features will
 in the future.
 
 You can use some AnyEvent::HTTP global function and variables.
-But use C<agent> of UA instead of $AnyEvent::HTTP::USERAGENT and C<max_redirect> instead of
-$AnyEvent::HTTP::MAX_RECURSE
+But use C<agent> of UA instead of C<$AnyEvent::HTTP::USERAGENT> and C<max_redirect>
+instead of C<$AnyEvent::HTTP::MAX_RECURSE>.
 
 =head1 SEE ALSO
 
@@ -68,13 +68,19 @@ sub simple_request {
     my $out_req;
     http_request $method => $uri, %$args, sub {
         my ($d, $h) = @_;
+
+        # special AnyEvent::HTTP's headers
         my $code = delete $h->{Status};
         my $message = delete $h->{Reason};
+
         my @headers;
         while (my @h = each %$h) {
             push @headers, @h;
         }
+
+        # special AnyEvent::HTTP codes
         if ($code >= 590 && $code <= 599) {
+            # make LWP-compatible error in the case of timeout
             if ($message =~ /timed/ && $code == 599) {
                 $d = '500 read timeout';
                 $code = 500;
@@ -104,6 +110,10 @@ sub lwp_request2anyevent_request {
         my ($header, $value) = @_;
         $out_headers->{$header} = $value;
     } );
+
+    # if we wil use some code like
+    #    local $AnyEvent::HTTP::USERAGENT = $useragent;
+    # in simple_request, it will not work properly in redirects
     $out_headers->{'User-Agent'} = $self->agent;
 
     my $body = $in_req->content;
@@ -111,7 +121,7 @@ sub lwp_request2anyevent_request {
     my %args = (
         headers => $out_headers,
         body    => $body,
-        recurse => 0,
+        recurse => 0, # because LWP call simple_request as much as needed
         timeout => $self->timeout,
     );
     return ($method, $uri, \%args);
