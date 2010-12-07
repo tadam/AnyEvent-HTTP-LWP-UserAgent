@@ -13,8 +13,8 @@ use warnings;
   my $ua = AnyEvent::HTTP::LWP::UserAgent->new;
   my @urls = (...);
   my @coro = map {
+      my $url = $_;
       async {
-          my $url = $_;
           my $r = $ua->get($url);
           print "url $url, content " . $r->content . "\n";
       }

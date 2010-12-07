@@ -1,4 +1,9 @@
 Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
+
+0.02    Tue Dec 07, 2010
+        Fix SYNOPSIS in POD.
+
+0.01    Fri Nov 26, 2010
         First prototype
