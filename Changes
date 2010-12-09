@@ -2,6 +2,10 @@ Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
 
+0.03    Thu Dec 09, 2010
+        Support cookies.
+        Fix headers that exists many times in response.
+
 0.02    Tue Dec 07, 2010
         Fix SYNOPSIS in POD, thanks to Ryan Perry.
 

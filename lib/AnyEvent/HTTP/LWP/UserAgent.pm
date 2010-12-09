@@ -73,9 +73,19 @@ sub simple_request {
         my $code = delete $h->{Status};
         my $message = delete $h->{Reason};
 
-        my @headers;
-        while (my @h = each %$h) {
-            push @headers, @h;
+        # AnyEvent::HTTP join headers by comma
+        # in this header exists many times in response.
+        # It is some trie to split such headers, I need
+        # to read RFCs more carefully.
+        my $headers = HTTP::Headers->new;
+        while (my ($header, $value) = each %$h) {
+            my @v = $value =~ /^([^ ].*?[^ ],)*([^ ].*?[^ ])$/;
+            @v = grep { defined($_) } @v;
+            if (scalar(@v) > 1) {
+                @v = map { s/,$//; $_ } @v;
+                $value = \@v;
+            }
+            $headers->header($header => $value);
         }
 
         # special AnyEvent::HTTP codes
@@ -88,12 +98,15 @@ sub simple_request {
                 $d = $message;
             }
         }
-        $out_req = HTTP::Response->new($code, $message, \@headers, $d);
+        $out_req = HTTP::Response->new($code, $message, $headers, $d);
         $cv->end;
     };
     $cv->recv;
 
     $out_req->request($in_req);
+    if ($self->cookie_jar) {
+        $self->cookie_jar->extract_cookies($out_req);
+    }
 
     return $out_req;
 }
@@ -103,6 +116,10 @@ sub lwp_request2anyevent_request {
 
     my $method = $in_req->method;
     my $uri = $in_req->uri->as_string;
+
+    if ($self->cookie_jar) {
+        $self->cookie_jar->add_cookie_header($in_req);
+    }
 
     my $in_headers = $in_req->headers;
     my $out_headers = {};
