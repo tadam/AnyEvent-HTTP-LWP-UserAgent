@@ -99,14 +99,27 @@ sub simple_request {
             }
         }
         $out_req = HTTP::Response->new($code, $message, $headers, $d);
+
+        $self->run_handlers(response_header => $out_req);
+
+        # from LWP::Protocol
+        my %skip_h;
+        for my $h ($self->handlers('response_data', $out_req)) {
+            next if $skip_h{$h};
+            unless ($h->{callback}->($out_req, $self, $h, $d)) {
+                # XXX remove from $response->{handlers}{response_data} if present
+                $skip_h{$h}++;
+            }
+        }
+
         $cv->end;
     };
     $cv->recv;
 
     $out_req->request($in_req);
-    if ($self->cookie_jar) {
-        $self->cookie_jar->extract_cookies($out_req);
-    }
+
+    # cookie_jar will be set by the handler
+    $self->run_handlers(response_done => $out_req);
 
     return $out_req;
 }
