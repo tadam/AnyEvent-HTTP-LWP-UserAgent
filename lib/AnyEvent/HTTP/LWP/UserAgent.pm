@@ -55,6 +55,7 @@ L<http://github.com/tadam/AnyEvent-HTTP-LWP-UserAgent>, L<Coro::LWP>, L<AnyEvent
 
 use parent qw(LWP::UserAgent);
 
+use LWP::UserAgent 5.815; # first version with handlers
 use AnyEvent::HTTP;
 use HTTP::Response;
 
