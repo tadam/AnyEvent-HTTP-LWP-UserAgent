@@ -2,6 +2,9 @@ Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
 
+0.05    Thu Mar 03, 2011
+        Increase version.
+
 0.04    Thu Mar 03, 2011
         More compatible with LWP::UserAgent using handlers.
         Thanks motetem (Masatoshi Fujimura) for patch.
