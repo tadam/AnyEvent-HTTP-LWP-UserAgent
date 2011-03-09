@@ -62,17 +62,23 @@ use HTTP::Response;
 sub simple_request {
     my ($self, $in_req, $arg, $size) = @_;
 
-    my ($method, $uri, $args) = $self->lwp_request2anyevent_request($in_req);
+    my ($method, $uri_ref, $args) = $self->lwp_request2anyevent_request($in_req);
 
     my $cv = AE::cv;
     $cv->begin;
     my $out_req;
-    http_request $method => $uri, %$args, sub {
+    http_request $method => $$uri_ref, %$args, sub {
         my ($d, $h) = @_;
 
         # special AnyEvent::HTTP's headers
         my $code = delete $h->{Status};
         my $message = delete $h->{Reason};
+
+        # Now we don't use in any place this AnyEvent::HTTP pseudo-headers, so
+        # just delete it
+        for (qw/HTTPVersion OrigStatus OrigReason Redirect URL/) {
+            delete $h->{$_};
+        }
 
         # AnyEvent::HTTP join headers by comma
         # in this header exists many times in response.
@@ -80,6 +86,11 @@ sub simple_request {
         # to read RFCs more carefully.
         my $headers = HTTP::Headers->new;
         while (my ($header, $value) = each %$h) {
+            # In previous versions it was a place where heavily used
+            # Coro stack (if Coro used) when you had pseudo-header URL
+            # and URL was really big.
+            # Now it's not such a big problem, we delete URL pseudo-header
+            # and haven't sudden gigantous headers (I hope).
             my @v = $value =~ /^([^ ].*?[^ ],)*([^ ].*?[^ ])$/;
             @v = grep { defined($_) } @v;
             if (scalar(@v) > 1) {
@@ -155,7 +166,7 @@ sub lwp_request2anyevent_request {
         recurse => 0, # because LWP call simple_request as much as needed
         timeout => $self->timeout,
     );
-    return ($method, $uri, \%args);
+    return ($method, \$uri, \%args);
 }
 
 1;

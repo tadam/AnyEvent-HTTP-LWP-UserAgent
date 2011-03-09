@@ -2,6 +2,10 @@ Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
 
+0.06    Wed Mar 09, 2011
+        Don't overload Coro stack when we have
+        a really big url.
+
 0.05    Thu Mar 03, 2011
         Increase version.
 
