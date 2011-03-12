@@ -1,6 +1,9 @@
 Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
+        Use new version of AnyEvent::HTTP with persistent
+        connections. Initial support of LWP's conn_cache
+        for it.
 
 0.06    Wed Mar 09, 2011
         Don't overload Coro stack when we have

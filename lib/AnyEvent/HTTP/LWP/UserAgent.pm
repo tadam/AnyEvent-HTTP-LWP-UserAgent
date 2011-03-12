@@ -35,29 +35,49 @@ AnyEvent::HTTP::LWP::UserAgent uses AnyEvent::HTTP inside but have an interface 
 LWP::UserAgent.
 You can safely use this module in Coro environment (and possibly in AnyEvent too).
 
-=head1 LIMITATIONS AND DETAILS
-
-You can use it only for HTTP(S)/1.0 requests.
-
-Some features of LWP::UserAgent can be broken (C<protocols_forbidden>, C<conn_cache>
-or something else). Precise documentation and realization of these features will come
-in the future.
-
-You can use some AnyEvent::HTTP global function and variables.
-But use C<agent> of UA instead of C<$AnyEvent::HTTP::USERAGENT> and C<max_redirect>
-instead of C<$AnyEvent::HTTP::MAX_RECURSE>.
-
-=head1 SEE ALSO
-
-L<http://github.com/tadam/AnyEvent-HTTP-LWP-UserAgent>, L<Coro::LWP>, L<AnyEvent::HTTP>
-
 =cut
 
 use parent qw(LWP::UserAgent);
 
 use LWP::UserAgent 5.815; # first version with handlers
-use AnyEvent::HTTP;
+use AnyEvent::HTTP 2.1;
 use HTTP::Response;
+
+=head1 SOME METHODS
+
+=over
+
+=item $ua->conn_cache
+
+=item $ua->conn_cache($cache_obj)
+
+New versions of C<AnyEvent::HTTP> supports HTTP(S)/1.1 persistent connection, so
+you can control it in C<#ABSTRACT> using C<conn_cache> method.
+
+If you set C<conn_cache> (as C<LWP::ConnCache> object) then
+C<Anyevent::HTTP::LWP::UserAgent> makes two things. In first it sets global variable
+C<$AnyEvent::HTTP::ACTIVE> as you setted C<total_capacity> for C<conn_cache> (be careful: this have a global consequences, not local). And in the second C<#ABSTRACT> will create persistent connections if your C<$ua> have C<conn_cache> (local propery of C<$ua>).
+
+But you can't use remainder methods of your C<conn_cache>, all connections will
+contains in C<AnyEvent::HTTP>. C<$AnyEvent::HTTP::ACTIVE> sets only when you set
+C<conn_cache> for C<$ua>. If you just change C<total_capacity> of old C<conn_cache>
+it will not change anything.
+
+=cut
+
+sub conn_cache {
+    my $self = shift;
+
+    my $res = $self->SUPER::conn_cache(@_);
+    my $cache = $self->SUPER::conn_cache;
+    if ($cache) {
+        my $total_capacity = $cache->total_capacity;
+        $total_capacity = 100_000 unless(defined($total_capacity));
+        $AnyEvent::HTTP::ACTIVE = $total_capacity;
+    }
+
+    return $res;
+}
 
 sub simple_request {
     my ($self, $in_req, $arg, $size) = @_;
@@ -166,7 +186,38 @@ sub lwp_request2anyevent_request {
         recurse => 0, # because LWP call simple_request as much as needed
         timeout => $self->timeout,
     );
+    if ($self->conn_cache) {
+        $args{persistent} = 1;
+        $args{keepalive} = 1;
+    } else {
+        # By default AnyEvent::HTTP set persistent = 1 for idempotent
+        # requests. So just for compatibility with LWP::UserAgent we
+        # disable this options.
+        $args{persistent} = 0;
+        $args{keepalive} = 0;
+    }
     return ($method, \$uri, \%args);
 }
 
 1;
+
+__END__
+
+=back
+
+=head1 LIMITATIONS AND DETAILS
+
+Some features of LWP::UserAgent can be broken (C<protocols_forbidden>, C<conn_cache>
+or something else). Precise documentation and realization of these features will come
+in the future.
+
+You can use some AnyEvent::HTTP global function and variables.
+But use C<agent> of UA instead of C<$AnyEvent::HTTP::USERAGENT> and C<max_redirect>
+instead of C<$AnyEvent::HTTP::MAX_RECURSE>.
+
+=head1 SEE ALSO
+
+L<http://github.com/tadam/AnyEvent-HTTP-LWP-UserAgent>, L<Coro::LWP>, L<AnyEvent::HTTP>
+
+=cut
+
