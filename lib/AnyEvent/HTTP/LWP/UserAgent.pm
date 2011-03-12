@@ -52,11 +52,13 @@ use HTTP::Response;
 =item $ua->conn_cache($cache_obj)
 
 New versions of C<AnyEvent::HTTP> supports HTTP(S)/1.1 persistent connection, so
-you can control it in C<#ABSTRACT> using C<conn_cache> method.
+you can control it in C<AnyEvent::HTTP::LWP::UserAgent> using C<conn_cache> method.
 
 If you set C<conn_cache> (as C<LWP::ConnCache> object) then
 C<Anyevent::HTTP::LWP::UserAgent> makes two things. In first it sets global variable
-C<$AnyEvent::HTTP::ACTIVE> as you setted C<total_capacity> for C<conn_cache> (be careful: this have a global consequences, not local). And in the second C<#ABSTRACT> will create persistent connections if your C<$ua> have C<conn_cache> (local propery of C<$ua>).
+C<$AnyEvent::HTTP::ACTIVE> as you setted C<total_capacity> for C<conn_cache> (be careful:
+this have a global consequences, not local). And in the second C<AnyEvent::HTTP::LWP::UserAgent>
+will create persistent connections if your C<$ua> have C<conn_cache> (local propery of C<$ua>).
 
 But you can't use remainder methods of your C<conn_cache>, all connections will
 contains in C<AnyEvent::HTTP>. C<$AnyEvent::HTTP::ACTIVE> sets only when you set
@@ -207,9 +209,8 @@ __END__
 
 =head1 LIMITATIONS AND DETAILS
 
-Some features of LWP::UserAgent can be broken (C<protocols_forbidden>, C<conn_cache>
-or something else). Precise documentation and realization of these features will come
-in the future.
+Some features of LWP::UserAgent can be broken (C<protocols_forbidden> or something else).
+Precise documentation and realization of these features will come in the future.
 
 You can use some AnyEvent::HTTP global function and variables.
 But use C<agent> of UA instead of C<$AnyEvent::HTTP::USERAGENT> and C<max_redirect>
