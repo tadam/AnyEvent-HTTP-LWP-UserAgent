@@ -39,9 +39,10 @@ You can safely use this module in Coro environment (and possibly in AnyEvent too
 
 use parent qw(LWP::UserAgent);
 
-use LWP::UserAgent 5.815; # first version with handlers
-use AnyEvent::HTTP 2.1;
+use AnyEvent 5;           # AE syntax
+use AnyEvent::HTTP 2.1;   # http(s)/1.1
 use HTTP::Response;
+use LWP::UserAgent 5.815; # first version with handlers
 
 =head1 SOME METHODS
 
