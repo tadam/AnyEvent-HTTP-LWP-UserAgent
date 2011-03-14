@@ -1,6 +1,8 @@
 Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
+
+0.07    Mon Mar 14, 2011
         Use new version of AnyEvent::HTTP with persistent
         connections. Initial support of LWP's conn_cache
         for it.
