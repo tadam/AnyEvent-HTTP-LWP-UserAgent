@@ -21,6 +21,26 @@ use warnings;
   } @urls;
   $_->join for @coro;
 
+  # Or without Coro
+  use AnyEvent::HTTP::LWP::UserAgent;
+  use AnyEvent;
+
+  my $ua = AnyEvent::HTTP::LWP::UserAgent->new;
+  my @urls = (...);
+  my $cv = AE::cv;
+  $cv->begin;
+  foreach my $url (@urls) {
+      $cv->begin;
+      $ua->get_async($url)->cb(sub {
+          my $r = shift->recv;
+          print "url $url, content " . $r->content . "\n";
+          $cv->end;
+      });
+  }
+  $cv->end;
+  $cv->recv;
+
+
 =head1 DESCRIPTION
 
 When you use Coro you have a choice: you can use L<Coro::LWP> or L<AnyEvent::HTTP>
@@ -34,6 +54,10 @@ asynchronous code.
 AnyEvent::HTTP::LWP::UserAgent uses AnyEvent::HTTP inside but have an interface of
 LWP::UserAgent.
 You can safely use this module in Coro environment (and possibly in AnyEvent too).
+
+In plain AnyEvent, you may use _async methods.
+They don't make blocking wait but return condition variable.
+So, you can avoid recursive blocking wait error.
 
 =cut
 
@@ -82,13 +106,45 @@ sub conn_cache {
     return $res;
 }
 
-sub simple_request {
+=back
+
+=head1 ASYNC METHODS
+
+The following methods are async version of corresponding methods w/o _async suffix.
+Parameters are identical as originals.
+However, return value becomes condition variable.
+You can use it in a synchornous way by blocking wait
+
+  $ua->simple_request_async(@args)->recv
+
+or in an asynchronous way, also.
+
+  $ua->simple_request_async(@args)->cb(sub { ... });
+
+=over 4
+
+=item simple_request_async
+
+=item request_async
+
+=item get_async
+
+=item post_async
+
+=item head_async
+
+=item put_async
+
+=item delete_async
+
+=cut
+
+sub simple_request_async {
     my ($self, $in_req, $arg, $size) = @_;
 
     my ($method, $uri_ref, $args) = $self->lwp_request2anyevent_request($in_req);
 
     my $cv = AE::cv;
-    $cv->begin;
     my $out_req;
     http_request $method => $$uri_ref, %$args, sub {
         my ($d, $h) = @_;
@@ -147,16 +203,78 @@ sub simple_request {
             }
         }
 
-        $cv->end;
+        $out_req->request($in_req);
+
+        # cookie_jar will be set by the handler
+        $self->run_handlers(response_done => $out_req);
+
+        $cv->send($out_req);
     };
-    $cv->recv;
 
-    $out_req->request($in_req);
+    return $cv;
+}
 
-    # cookie_jar will be set by the handler
-    $self->run_handlers(response_done => $out_req);
+sub simple_request {
+    return shift->simple_request_async(@_)->recv;
+}
 
-    return $out_req;
+sub get_async {
+    require HTTP::Request::Common;
+    my($self, @parameters) = @_;
+    my @suff = $self->_process_colonic_headers(\@parameters,1);
+    return $self->request_async( HTTP::Request::Common::GET( @parameters ), @suff );
+}
+
+
+sub post_async {
+    require HTTP::Request::Common;
+    my($self, @parameters) = @_;
+    my @suff = $self->_process_colonic_headers(\@parameters, (ref($parameters[1]) ? 2 : 1));
+    return $self->request_async( HTTP::Request::Common::POST( @parameters ), @suff );
+}
+
+
+sub head_async {
+    require HTTP::Request::Common;
+    my($self, @parameters) = @_;
+    my @suff = $self->_process_colonic_headers(\@parameters,1);
+    return $self->request_async( HTTP::Request::Common::HEAD( @parameters ), @suff );
+}
+
+
+sub put_async {
+    require HTTP::Request::Common;
+    my($self, @parameters) = @_;
+    my @suff = $self->_process_colonic_headers(\@parameters, (ref($parameters[1]) ? 2 : 1));
+    return $self->request_async( HTTP::Request::Common::PUT( @parameters ), @suff );
+}
+
+
+sub delete_async {
+    require HTTP::Request::Common;
+    my($self, @parameters) = @_;
+    my @suff = $self->_process_colonic_headers(\@parameters,1);
+    return $self->request_async( HTTP::Request::Common::DELETE( @parameters ), @suff );
+}
+
+sub get {
+    return shift->get_async(@_)->recv;
+}
+
+sub post {
+    return shift->post_async(@_)->recv;
+}
+
+sub head {
+    return shift->head_async(@_)->recv;
+}
+
+sub put {
+    return shift->put_async(@_)->recv;
+}
+
+sub delete {
+    return shift->delete_async(@_)->recv;
 }
 
 sub lwp_request2anyevent_request {
@@ -200,6 +318,143 @@ sub lwp_request2anyevent_request {
         $args{keepalive} = 0;
     }
     return ($method, \$uri, \%args);
+}
+
+sub request_async
+{
+    my($self, $request, $arg, $size, $previous) = @_;
+
+    my $cv = AE::cv;
+    $self->simple_request_async($request, $arg, $size)->cb(sub {
+    my $response = shift->recv;
+    $response->previous($previous) if $previous;
+
+    if ($response->redirects >= $self->{max_redirect}) {
+        $response->header("Client-Warning" =>
+                          "Redirect loop detected (max_redirect = $self->{max_redirect})");
+        $cv->send($response); return;
+    }
+
+    if (my $req = $self->run_handlers("response_redirect", $response)) {
+        $self->request_async($req, $arg, $size, $response)->cb(sub { $cv->send(shift->recv) }); return;
+    }
+
+    my $code = $response->code;
+
+    if ($code == &HTTP::Status::RC_MOVED_PERMANENTLY or
+	$code == &HTTP::Status::RC_FOUND or
+	$code == &HTTP::Status::RC_SEE_OTHER or
+	$code == &HTTP::Status::RC_TEMPORARY_REDIRECT)
+    {
+	my $referral = $request->clone;
+
+	# These headers should never be forwarded
+	$referral->remove_header('Host', 'Cookie');
+	
+	if ($referral->header('Referer') &&
+	    $request->uri->scheme eq 'https' &&
+	    $referral->uri->scheme eq 'http')
+	{
+	    # RFC 2616, section 15.1.3.
+	    # https -> http redirect, suppressing Referer
+	    $referral->remove_header('Referer');
+	}
+
+	if ($code == &HTTP::Status::RC_SEE_OTHER ||
+	    $code == &HTTP::Status::RC_FOUND) 
+        {
+	    my $method = uc($referral->method);
+	    unless ($method eq "GET" || $method eq "HEAD") {
+		$referral->method("GET");
+		$referral->content("");
+		$referral->remove_content_headers;
+	    }
+	}
+
+	# And then we update the URL based on the Location:-header.
+	my $referral_uri = $response->header('Location');
+	{
+	    # Some servers erroneously return a relative URL for redirects,
+	    # so make it absolute if it not already is.
+	    local $URI::ABS_ALLOW_RELATIVE_SCHEME = 1;
+	    my $base = $response->base;
+	    $referral_uri = "" unless defined $referral_uri;
+	    $referral_uri = $HTTP::URI_CLASS->new($referral_uri, $base)
+		            ->abs($base);
+	}
+	$referral->uri($referral_uri);
+
+	if($self->redirect_ok($referral, $response)) {
+	    $self->request_async($referral, $arg, $size, $response)->cb(sub{ $cv->send(shfit->recv) }); return;
+	} else {
+	    $cv->send($response); return;
+	}
+
+    }
+    elsif ($code == &HTTP::Status::RC_UNAUTHORIZED ||
+	     $code == &HTTP::Status::RC_PROXY_AUTHENTICATION_REQUIRED
+	    )
+    {
+	my $proxy = ($code == &HTTP::Status::RC_PROXY_AUTHENTICATION_REQUIRED);
+	my $ch_header = $proxy ?  "Proxy-Authenticate" : "WWW-Authenticate";
+	my @challenge = $response->header($ch_header);
+	unless (@challenge) {
+	    $response->header("Client-Warning" => 
+			      "Missing Authenticate header");
+	    $cv->send($response); return;
+	}
+
+	require HTTP::Headers::Util;
+	CHALLENGE: for my $challenge (@challenge) {
+	    $challenge =~ tr/,/;/;  # "," is used to separate auth-params!!
+	    ($challenge) = HTTP::Headers::Util::split_header_words($challenge);
+	    my $scheme = shift(@$challenge);
+	    shift(@$challenge); # no value
+	    $challenge = { @$challenge };  # make rest into a hash
+
+	    unless ($scheme =~ /^([a-z]+(?:-[a-z]+)*)$/) {
+		$response->header("Client-Warning" => 
+				  "Bad authentication scheme '$scheme'");
+		$cv->send($response); return;
+	    }
+	    $scheme = $1;  # untainted now
+	    my $class = "LWP::Authen::\u$scheme";
+	    $class =~ s/-/_/g;
+
+	    no strict 'refs';
+	    unless (%{"$class\::"}) {
+		# try to load it
+		eval "require $class";
+		if ($@) {
+		    if ($@ =~ /^Can\'t locate/) {
+			$response->header("Client-Warning" =>
+					  "Unsupported authentication scheme '$scheme'");
+		    }
+		    else {
+			$response->header("Client-Warning" => $@);
+		    }
+		    next CHALLENGE;
+		}
+	    }
+	    unless ($class->can("authenticate")) {
+		$response->header("Client-Warning" =>
+				  "Unsupported authentication scheme '$scheme'");
+		next CHALLENGE;
+	    }
+# TODO: Maybe able to be more asynchronous
+	    $cv->send($class->authenticate($self, $proxy, $challenge, $response,
+					$request, $arg, $size)); return;
+	}
+	$cv->send($response); return
+    }
+    $cv->send($response); return;
+    });
+    return $cv;
+}
+
+sub request
+{
+    return shift->request_async(@_)->recv;
 }
 
 1;
