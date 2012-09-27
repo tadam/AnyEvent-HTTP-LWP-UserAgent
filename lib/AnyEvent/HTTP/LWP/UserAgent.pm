@@ -113,7 +113,7 @@ sub conn_cache {
 The following methods are async version of corresponding methods w/o _async suffix.
 Parameters are identical as originals.
 However, return value becomes condition variable.
-You can use it in a synchornous way by blocking wait
+You can use it in a synchronous way by blocking wait
 
   $ua->simple_request_async(@args)->recv
 
