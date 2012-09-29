@@ -385,7 +385,7 @@ sub request_async
 	$referral->uri($referral_uri);
 
 	if($self->redirect_ok($referral, $response)) {
-	    $self->request_async($referral, $arg, $size, $response)->cb(sub{ $cv->send(shfit->recv) }); return;
+	    $self->request_async($referral, $arg, $size, $response)->cb(sub{ $cv->send(shift->recv) }); return;
 	} else {
 	    $cv->send($response); return;
 	}
