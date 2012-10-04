@@ -350,7 +350,7 @@ sub request_async
 
 	# These headers should never be forwarded
 	$referral->remove_header('Host', 'Cookie');
-	
+
 	if ($referral->header('Referer') &&
 	    $request->uri->scheme eq 'https' &&
 	    $referral->uri->scheme eq 'http')
@@ -361,7 +361,7 @@ sub request_async
 	}
 
 	if ($code == &HTTP::Status::RC_SEE_OTHER ||
-	    $code == &HTTP::Status::RC_FOUND) 
+	    $code == &HTTP::Status::RC_FOUND)
         {
 	    my $method = uc($referral->method);
 	    unless ($method eq "GET" || $method eq "HEAD") {
@@ -399,7 +399,7 @@ sub request_async
 	my $ch_header = $proxy ?  "Proxy-Authenticate" : "WWW-Authenticate";
 	my @challenge = $response->header($ch_header);
 	unless (@challenge) {
-	    $response->header("Client-Warning" => 
+	    $response->header("Client-Warning" =>
 			      "Missing Authenticate header");
 	    $cv->send($response); return;
 	}
@@ -413,7 +413,7 @@ sub request_async
 	    $challenge = { @$challenge };  # make rest into a hash
 
 	    unless ($scheme =~ /^([a-z]+(?:-[a-z]+)*)$/) {
-		$response->header("Client-Warning" => 
+		$response->header("Client-Warning" =>
 				  "Bad authentication scheme '$scheme'");
 		$cv->send($response); return;
 	    }
@@ -474,7 +474,15 @@ instead of C<$AnyEvent::HTTP::MAX_RECURSE>.
 
 =head1 SEE ALSO
 
-L<http://github.com/tadam/AnyEvent-HTTP-LWP-UserAgent>, L<Coro::LWP>, L<AnyEvent::HTTP>
+L<http://github.com/tadam/AnyEvent-HTTP-LWP-UserAgent>
+L<Coro::LWP>
+L<AnyEvent::HTTP>
+L<LWP::Protocol::AnyEvent::http>
+L<LWP::Protocol::Coro::http>
+
+=head1 ACKNOWLEDGEMENTS
+
+Yasutaka Atarashi
 
 =cut
 

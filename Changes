@@ -1,6 +1,8 @@
 Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
+        Fair support of pure AnyEvent without Coro.
+        Thanks to Yasutaka Atarashi.
 
 0.07    Mon Mar 14, 2011
         Use new version of AnyEvent::HTTP with persistent
