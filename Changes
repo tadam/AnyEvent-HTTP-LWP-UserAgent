@@ -1,6 +1,8 @@
 Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
+
+0.08    Fri Oct 05, 2012
         Fair support of pure AnyEvent without Coro.
         Thanks to Yasutaka Atarashi.
 
