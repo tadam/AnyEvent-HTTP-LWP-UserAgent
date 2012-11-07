@@ -146,8 +146,41 @@ sub simple_request_async {
 
     my $cv = AE::cv;
     my $out_req;
-    http_request $method => $$uri_ref, %$args, sub {
-        my ($d, $h) = @_;
+    my $content = '';
+    my $fh;
+    if(!ref($arg) && length($arg)) {
+        open $fh, '>', $arg or $cv->croak("Can't write to '$arg': $!");
+        binmode $fh;
+        $args->{on_body} = sub {
+            my ($d, $h) = @_;
+            if($out_req->code < 200 || 300 <= $out_req->code) { # not success
+                $content .= $d;
+            } else {
+                print $fh $d or $cv->croak("Can't write to '$arg': $!");
+            }
+            return 1;
+        };
+    } elsif(ref($arg) eq 'CODE') {
+        $args->{on_body} = sub {
+            my ($d, $h) = @_;
+            if($out_req->code < 200 || 300 <= $out_req->code) { # not success
+                $content .= $d;
+            } else {
+                eval { $arg->($d, $out_req, undef) };
+                my $err = $@;
+                if($err) {
+                    chomp $err;
+                    $out_req->header('X-Died' => $err);
+                    $out_req->header('Client-Aborted' => 'die');
+                    return 0;
+                }
+            }
+            return 1;
+        };
+    }
+    $args->{on_header} = sub {
+        my ($h) = @_;
+        my $d;
 
         # special AnyEvent::HTTP's headers
         my $code = delete $h->{Status};
@@ -192,6 +225,15 @@ sub simple_request_async {
         $out_req = HTTP::Response->new($code, $message, $headers, $d);
 
         $self->run_handlers(response_header => $out_req);
+
+        return 1;
+    };
+
+    http_request $method => $$uri_ref, %$args, sub {
+        my ($d, $h) = @_;
+        $d = $content if $content ne '';
+        $out_req->content($d);
+        close($fh) or $cv->croak("Can't write to '$arg': $!") if defined ($fh);
 
         # from LWP::Protocol
         my %skip_h;
