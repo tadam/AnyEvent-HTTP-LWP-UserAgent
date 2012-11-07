@@ -299,7 +299,18 @@ sub lwp_request2anyevent_request {
     # in simple_request, it will not work properly in redirects
     $out_headers->{'User-Agent'} = $self->agent;
 
-    my $body = $in_req->content;
+    my $body;
+    if(ref($in_req->content) eq 'CODE') {
+        # Minimum coderef support
+        # TODO: Add chunked transfer but maybe necessary to modify AnyEvent::HTTP itself
+        $body = '';
+        while(my $ret = $in_req->content->()) {
+            $body .= $ret;
+            last if $ret eq '';
+        }
+    } else {
+        $body = $in_req->content;
+    }
 
     my %args = (
         headers => $out_headers,
