@@ -232,7 +232,7 @@ sub simple_request_async {
     http_request $method => $$uri_ref, %$args, sub {
         my ($d, $h) = @_;
         $d = $content if $content ne '';
-        $out_req->content($d);
+        $out_req->content($d) if defined $d;
         close($fh) or $cv->croak("Can't write to '$arg': $!") if defined ($fh);
 
         # from LWP::Protocol
