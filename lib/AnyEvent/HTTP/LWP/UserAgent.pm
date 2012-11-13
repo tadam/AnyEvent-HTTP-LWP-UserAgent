@@ -178,9 +178,8 @@ sub simple_request_async {
             return 1;
         };
     }
-    $args->{on_header} = sub {
-        my ($h) = @_;
-        my $d;
+    my $header_init = sub {
+        my ($d, $h) = @_;
 
         # special AnyEvent::HTTP's headers
         my $code = delete $h->{Status};
@@ -228,10 +227,15 @@ sub simple_request_async {
 
         return 1;
     };
+    $args->{on_header} = sub {
+        my ($h) = @_;
+        $header_init->(undef, $h);
+    };
 
     http_request $method => $$uri_ref, %$args, sub {
         my ($d, $h) = @_;
         $d = $content if $content ne '';
+        $header_init->($d, $h) if ! defined $out_req;
         $out_req->content($d) if defined $d;
         close($fh) or $cv->croak("Can't write to '$arg': $!") if defined ($fh);
 
