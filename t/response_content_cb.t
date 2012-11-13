@@ -41,7 +41,7 @@ __HTML__
     }
 }
 
-plan tests => 11;
+plan tests => 12;
 
 Test::TCP::test_tcp(
     server => sub {
