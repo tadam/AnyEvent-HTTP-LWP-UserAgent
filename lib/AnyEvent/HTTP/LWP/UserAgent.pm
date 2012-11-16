@@ -529,6 +529,14 @@ You can use some AnyEvent::HTTP global function and variables.
 But use C<agent> of UA instead of C<$AnyEvent::HTTP::USERAGENT> and C<max_redirect>
 instead of C<$AnyEvent::HTTP::MAX_RECURSE>.
 
+Content in request can be specified by code reference.
+This is the same as L<LWP::UserAgent> but there are some limitations.
+L<LWP::UserAgent> uses chunked encoding if Content-Length is not specified,
+while this module does NOT use chunked encoding even if Content-Length is not specified.
+
+Content in response can be specified as filename or code reference.
+This is the same as L<LWP::UserAgent>.
+
 =head1 SEE ALSO
 
 L<http://github.com/tadam/AnyEvent-HTTP-LWP-UserAgent>
