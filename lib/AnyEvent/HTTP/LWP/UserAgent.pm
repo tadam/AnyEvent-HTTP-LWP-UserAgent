@@ -239,13 +239,15 @@ sub simple_request_async {
         $out_req->content($d) if defined $d;
         close($fh) or $cv->croak("Can't write to '$arg': $!") if defined ($fh);
 
-        # from LWP::Protocol
-        my %skip_h;
-        for my $h ($self->handlers('response_data', $out_req)) {
-            next if $skip_h{$h};
-            unless ($h->{callback}->($out_req, $self, $h, $d)) {
-                # XXX remove from $response->{handlers}{response_data} if present
-                $skip_h{$h}++;
+        if(length $d) {
+            # from LWP::Protocol
+            my %skip_h;
+            for my $h ($self->handlers('response_data', $out_req)) {
+                next if $skip_h{$h};
+                unless ($h->{callback}->($out_req, $self, $h, $d)) {
+                    # XXX remove from $response->{handlers}{response_data} if present
+                    $skip_h{$h}++;
+                }
             }
         }
 
