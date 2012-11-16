@@ -1,6 +1,15 @@
 use strict;
 use Test::More;
-use AnyEvent::HTTP::LWP::UserAgent;
+my $pkg;
+BEGIN {
+    if(exists $ENV{USE_LWP}) {
+        require LWP::UserAgent;
+        $pkg = 'LWP::UserAgent';
+    } else {
+        require AnyEvent::HTTP::LWP::UserAgent;
+        $pkg = 'AnyEvent::HTTP::LWP::UserAgent';
+    }
+}
 
 BEGIN {
     eval q{ require Test::TCP } or plan skip_all => 'Could not require Test::TCP';
@@ -45,8 +54,10 @@ Test::TCP::test_tcp(
     client => sub {
         my $port = shift;
         my @content = ('This', ' ', 'is', ' ', 'content.', '');
-        my $ua = AnyEvent::HTTP::LWP::UserAgent->new(cookie_jar => {});
-        my $req = HTTP::Request->new('PUT', "http://localhost:$port/", ['Content-Type' => 'text/plain'], sub { return shift @content });
+        my $ua = $pkg->new(cookie_jar => {});
+        # For AnyEvent::HTTP::LWP::UserAgent, even if Content-Length is not specified, chunked encoding is NOT used.
+        # For LWP::UserAgent, if Content-Length is not specified, chunked encoding is used.
+        my $req = HTTP::Request->new('PUT', "http://localhost:$port/", ['Content-Type' => 'text/plain', 'Content-Length' => 16], sub { return shift @content });
         my $res = $ua->request($req);
         ok $res->is_success;
         like $ua->cookie_jar->as_string, qr/test=abc/, '$ua->cookie_jar set';

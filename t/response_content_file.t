@@ -1,6 +1,15 @@
 use strict;
 use Test::More;
-use AnyEvent::HTTP::LWP::UserAgent;
+my $pkg;
+BEGIN {
+    if(exists $ENV{USE_LWP}) {
+        require LWP::UserAgent;
+        $pkg = 'LWP::UserAgent';
+    } else {
+        require AnyEvent::HTTP::LWP::UserAgent;
+        $pkg = 'AnyEvent::HTTP::LWP::UserAgent';
+    }
+}
 use File::Temp;
 
 BEGIN {
@@ -53,7 +62,7 @@ Test::TCP::test_tcp(
     client => sub {
         my $port = shift;
         {
-            my $ua = AnyEvent::HTTP::LWP::UserAgent->new(cookie_jar => {});
+            my $ua = $pkg->new(cookie_jar => {});
             my $temp = File::Temp->new;
             my $res = $ua->get("http://localhost:$port/", ':content_file' => $temp->filename);
             ok $res->is_success, 'is_success';
@@ -67,7 +76,7 @@ Test::TCP::test_tcp(
             }
         }
         {
-            my $ua = AnyEvent::HTTP::LWP::UserAgent->new(cookie_jar => {});
+            my $ua = $pkg->new(cookie_jar => {});
             my $temp = File::Temp->new;
             my $res = $ua->get("http://localhost:$port/error", ':content_file' => $temp->filename);
             ok !$res->is_success, '!is_success when error';

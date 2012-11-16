@@ -1,6 +1,15 @@
 use strict;
 use Test::More;
-use AnyEvent::HTTP::LWP::UserAgent;
+my $pkg;
+BEGIN {
+    if(exists $ENV{USE_LWP}) {
+        require LWP::UserAgent;
+        $pkg = 'LWP::UserAgent';
+    } else {
+        require AnyEvent::HTTP::LWP::UserAgent;
+        $pkg = 'AnyEvent::HTTP::LWP::UserAgent';
+    }
+}
 
 BEGIN {
     eval q{ require Test::TCP } or plan skip_all => 'Could not require Test::TCP';
@@ -52,7 +61,7 @@ Test::TCP::test_tcp(
     client => sub {
         my $port = shift;
         {
-            my $ua = AnyEvent::HTTP::LWP::UserAgent->new(cookie_jar => {});
+            my $ua = $pkg->new(cookie_jar => {});
             my $content = '';
             my $res = $ua->get("http://localhost:$port/", ':content_cb' => sub { $content .= $_[0] });
             ok $res->is_success, 'is_success';
@@ -61,7 +70,7 @@ Test::TCP::test_tcp(
             like $content, qr{<p>blahblahblha</p>}, 'valid callback';
         }
         {
-            my $ua = AnyEvent::HTTP::LWP::UserAgent->new(cookie_jar => {});
+            my $ua = $pkg->new(cookie_jar => {});
             my $res = $ua->get("http://localhost:$port/", ':content_cb' => sub { die 'Died by client'; });
             ok $res->is_success, 'is_success when client died';
             like $ua->cookie_jar->as_string, qr/test=abc/, '$ua->cookie_jar set when client died';
@@ -70,7 +79,7 @@ Test::TCP::test_tcp(
             like $res->header('Client-Aborted'), qr/die/, 'Client-Aborted: when client died';
         }
         {
-            my $ua = AnyEvent::HTTP::LWP::UserAgent->new(cookie_jar => {});
+            my $ua = $pkg->new(cookie_jar => {});
             my $content = '';
             my $res = $ua->get("http://localhost:$port/error", ':content_cb' => sub { $content .= $_[0] });
             ok !$res->is_success, '!is_success when error';
