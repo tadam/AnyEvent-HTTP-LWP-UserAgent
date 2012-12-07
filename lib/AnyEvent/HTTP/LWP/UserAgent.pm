@@ -146,7 +146,39 @@ sub simple_request_async {
 
     my $cv = AE::cv;
     my $out_req;
-    http_request $method => $$uri_ref, %$args, sub {
+    my $content = '';
+    my $fh;
+    if(!ref($arg) && length($arg)) {
+        open $fh, '>', $arg or $cv->croak("Can't write to '$arg': $!");
+        binmode $fh;
+        $args->{on_body} = sub {
+            my ($d, $h) = @_;
+            if($out_req->code < 200 || 300 <= $out_req->code) { # not success
+                $content .= $d;
+            } else {
+                print $fh $d or $cv->croak("Can't write to '$arg': $!");
+            }
+            return 1;
+        };
+    } elsif(ref($arg) eq 'CODE') {
+        $args->{on_body} = sub {
+            my ($d, $h) = @_;
+            if($out_req->code < 200 || 300 <= $out_req->code) { # not success
+                $content .= $d;
+            } else {
+                eval { $arg->($d, $out_req, undef) };
+                my $err = $@;
+                if($err) {
+                    chomp $err;
+                    $out_req->header('X-Died' => $err);
+                    $out_req->header('Client-Aborted' => 'die');
+                    return 0;
+                }
+            }
+            return 1;
+        };
+    }
+    my $header_init = sub {
         my ($d, $h) = @_;
 
         # special AnyEvent::HTTP's headers
@@ -193,13 +225,29 @@ sub simple_request_async {
 
         $self->run_handlers(response_header => $out_req);
 
-        # from LWP::Protocol
-        my %skip_h;
-        for my $h ($self->handlers('response_data', $out_req)) {
-            next if $skip_h{$h};
-            unless ($h->{callback}->($out_req, $self, $h, $d)) {
-                # XXX remove from $response->{handlers}{response_data} if present
-                $skip_h{$h}++;
+        return 1;
+    };
+    $args->{on_header} = sub {
+        my ($h) = @_;
+        $header_init->(undef, $h);
+    };
+
+    http_request $method => $$uri_ref, %$args, sub {
+        my ($d, $h) = @_;
+        $d = $content if $content ne '';
+        $header_init->($d, $h) if ! defined $out_req;
+        $out_req->content($d) if defined $d;
+        close($fh) or $cv->croak("Can't write to '$arg': $!") if defined ($fh);
+
+        if(length $d) {
+            # from LWP::Protocol
+            my %skip_h;
+            for my $h ($self->handlers('response_data', $out_req)) {
+                next if $skip_h{$h};
+                unless ($h->{callback}->($out_req, $self, $h, $d)) {
+                    # XXX remove from $response->{handlers}{response_data} if present
+                    $skip_h{$h}++;
+                }
             }
         }
 
@@ -299,7 +347,18 @@ sub lwp_request2anyevent_request {
     # in simple_request, it will not work properly in redirects
     $out_headers->{'User-Agent'} = $self->agent;
 
-    my $body = $in_req->content;
+    my $body;
+    if(ref($in_req->content) eq 'CODE') {
+        # Minimum coderef support
+        # TODO: Add chunked transfer but maybe necessary to modify AnyEvent::HTTP itself
+        $body = '';
+        while(my $ret = $in_req->content->()) {
+            $body .= $ret;
+            last if $ret eq '';
+        }
+    } else {
+        $body = $in_req->content;
+    }
 
     my %args = (
         headers => $out_headers,
@@ -471,6 +530,14 @@ Precise documentation and realization of these features will come in the future.
 You can use some AnyEvent::HTTP global function and variables.
 But use C<agent> of UA instead of C<$AnyEvent::HTTP::USERAGENT> and C<max_redirect>
 instead of C<$AnyEvent::HTTP::MAX_RECURSE>.
+
+Content in request can be specified by code reference.
+This is the same as L<LWP::UserAgent> but there are some limitations.
+L<LWP::UserAgent> uses chunked encoding if Content-Length is not specified,
+while this module does NOT use chunked encoding even if Content-Length is not specified.
+
+Content in response can be specified as filename or code reference.
+This is the same as L<LWP::UserAgent>.
 
 =head1 SEE ALSO
 
