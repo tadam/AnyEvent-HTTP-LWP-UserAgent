@@ -1,6 +1,8 @@
 Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
+        Add minimum support for request content by code reference,
+        response content by filename or code reference
 
 0.08    Fri Oct 05, 2012
         Fair support of pure AnyEvent without Coro.
