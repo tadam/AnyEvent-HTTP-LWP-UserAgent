@@ -1,6 +1,8 @@
 Revision history for AnyEvent-HTTP-LWP-UserAgent
 
 {{$NEXT}}
+
+0.09    Sat Dec 08, 2012
         Add minimum support for request content by code reference,
         response content by filename or code reference
 
