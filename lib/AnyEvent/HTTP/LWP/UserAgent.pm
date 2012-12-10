@@ -148,7 +148,7 @@ sub simple_request_async {
     my $out_req;
     my $content = '';
     my $fh;
-    if(!ref($arg) && length($arg)) {
+    if(!ref($arg) && defined($arg) && length($arg)) {
         open $fh, '>', $arg or $cv->croak("Can't write to '$arg': $!");
         binmode $fh;
         $args->{on_body} = sub {
@@ -239,7 +239,7 @@ sub simple_request_async {
         $out_req->content($d) if defined $d;
         close($fh) or $cv->croak("Can't write to '$arg': $!") if defined ($fh);
 
-        if(length $d) {
+        if(defined($d) && length($d)) {
             # from LWP::Protocol
             my %skip_h;
             for my $h ($self->handlers('response_data', $out_req)) {
