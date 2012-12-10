@@ -7,5 +7,5 @@ use AnyEvent::HTTP::LWP::UserAgent;
 # This test checks if this class does not die for the cases.
 
 my $ua = AnyEvent::HTTP::LWP::UserAgent->new;
-my $res = $ua->get('http://www.invalid/');
-ok ! $res->is_success;
+eval { my $res = $ua->get('http://www.invalid/'); };
+ok ! $@;
